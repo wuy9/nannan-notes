@@ -1,10 +1,515 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-k="1">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>南南的沉淀库</title>
+<meta name="description" content="个人沉淀库：把值得留住的东西存下来。">
+<style>
+:root{
+  --bg:#f7f3ec; --paper:#fffdf8; --ink:#2b2622; --ink-2:#6b6259; --ink-3:#9a9085;
+  --line:#e6ddd0; --line-2:#f0e9dd; --accent:#b5563a; --accent-soft:#f3e2db;
+  --shadow:0 1px 2px rgba(74,56,38,.06), 0 8px 24px -12px rgba(74,56,38,.18);
+  --radius:14px;
+  --fs:17px;
+}
+html[data-k="0"]{ --fs:15px; }
+html[data-k="1"]{ --fs:17px; }
+html[data-k="2"]{ --fs:19px; }
+html[data-theme="dark"]{
+  --bg:#1b1917; --paper:#232019; --ink:#ece5da; --ink-2:#a89f92; --ink-3:#7d7468;
+  --line:#37322a; --line-2:#2c2721; --accent:#d97a5c; --accent-soft:#3a2a23;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; min-height:100vh; display:flex; flex-direction:column;
+  background:var(--bg); color:var(--ink);
+  font-size:var(--fs);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC","Noto Sans CJK SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height:1.72; letter-spacing:.01em;
+  transition:background .25s ease,color .25s ease;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+
+/* ---------- 顶部 ---------- */
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-2)}
+.hd{display:flex;align-items:flex-end;gap:14px;padding:22px 0 14px;flex-wrap:wrap}
+.brand{flex:1 1 auto;min-width:200px}
+.brand h1{margin:0;font-size:1.42em;font-weight:650;letter-spacing:.02em}
+.brand .sub{margin:2px 0 0;color:var(--ink-3);font-size:.78em;letter-spacing:.04em}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.search{position:relative;display:flex;align-items:center}
+.search input{
+  width:220px;padding:9px 30px 9px 32px;font:inherit;font-size:.86em;color:var(--ink);
+  background:var(--paper);border:1px solid var(--line);border-radius:999px;outline:none;
+  transition:border-color .2s,box-shadow .2s,width .2s;
+}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search input::-webkit-search-cancel-button{display:none}
+.search .ico{position:absolute;left:11px;color:var(--ink-3);font-size:.85em;pointer-events:none}
+.search .clr{position:absolute;right:8px;border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:1em;line-height:1;padding:4px;display:none}
+.search .clr.on{display:block}
+button{font:inherit;cursor:pointer}
+.btn{
+  border:1px solid var(--line);background:var(--paper);color:var(--ink-2);
+  padding:8px 12px;border-radius:999px;font-size:.82em;transition:.18s;white-space:nowrap;
+}
+.btn:hover{color:var(--ink);border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.icon{padding:8px 10px;font-size:.9em;line-height:1}
+
+/* ---------- 标签栏 ---------- */
+.tags{display:flex;gap:7px;padding:0 0 12px;overflow-x:auto;scrollbar-width:none}
+.tags::-webkit-scrollbar{display:none}
+.chip{
+  border:1px solid var(--line);background:transparent;color:var(--ink-2);
+  padding:4px 11px;border-radius:999px;font-size:.76em;white-space:nowrap;transition:.18s;
+}
+.chip:hover{border-color:var(--ink-3);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.chip .n{opacity:.6;margin-left:4px;font-size:.9em}
+
+/* ---------- 列表 ---------- */
+main{padding:22px 0 8px;flex:1 0 auto}
+.card{
+  background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);
+  padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow);
+  transition:border-color .2s,transform .2s;position:relative;
+}
+.card:hover{border-color:var(--line)}
+.card h2{margin:0 0 8px;font-size:1.06em;font-weight:640;line-height:1.5}
+.card .body{color:var(--ink-2);font-size:.92em;white-space:pre-wrap;word-break:break-word;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.more{display:inline-block;border:0;background:none;color:var(--accent);font-size:.76em;padding:6px 0 0;letter-spacing:.02em}
+.card.open .more{margin-top:2px}
+.card.open .body{-webkit-line-clamp:unset;display:block}
+.card .meta{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.card .date{color:var(--ink-3);font-size:.74em;letter-spacing:.03em}
+.card .spacer{flex:1}
+.tag{background:var(--accent-soft);color:var(--accent);font-size:.72em;padding:2px 9px;border-radius:6px;letter-spacing:.02em}
+.acts{display:flex;gap:6px;opacity:0;transition:opacity .2s}
+.card:hover .acts,.card:focus-within .acts{opacity:1}
+.act{border:0;background:none;color:var(--ink-3);font-size:.76em;padding:2px 4px}
+.act:hover{color:var(--accent)}
+
+.empty{text-align:center;color:var(--ink-3);padding:56px 20px;font-size:.9em;line-height:2}
+.empty b{color:var(--ink-2);font-weight:600}
+
+/* ---------- 底部 ---------- */
+footer{border-top:1px solid var(--line-2);margin-top:26px;padding:18px 0 40px;
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--ink-3);font-size:.76em}
+footer .spacer{flex:1}
+footer button{border:0;background:none;color:var(--ink-3);font-size:1em;padding:4px 2px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+footer button:hover{color:var(--accent)}
+
+/* ---------- 对话框 ---------- */
+dialog{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:16px;
+  padding:0;width:min(620px,calc(100vw - 32px));box-shadow:0 24px 60px -20px rgba(40,28,14,.45)}
+dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
+.dlg-hd{display:flex;align-items:center;padding:18px 22px 0}
+.dlg-hd h2{margin:0;font-size:1em;font-weight:640}
+.dlg-bd{padding:14px 22px 4px;max-height:min(62vh,520px);overflow:auto}
+.dlg-ft{display:flex;gap:10px;justify-content:flex-end;padding:14px 22px 18px}
+label.f{display:block;margin-bottom:14px}
+label.f span{display:block;font-size:.76em;color:var(--ink-3);margin-bottom:5px;letter-spacing:.04em}
+label.f input,label.f textarea{
+  width:100%;font:inherit;font-size:.88em;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:9px;padding:9px 11px;outline:none;transition:.18s;
+}
+label.f input:focus,label.f textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+label.f textarea{resize:vertical;min-height:130px;line-height:1.7}
+.hint{font-size:.72em;color:var(--ink-3);margin:-8px 0 14px}
+
+@media (max-width:600px){
+  .hd{padding:16px 0 10px}
+  .brand h1{font-size:1.24em}
+  .search input{width:150px}
+  .search input:focus{width:190px}
+  .card{padding:15px 16px}
+  .acts{opacity:1}
+}
+</style>
 </head>
 <body>
+
+<header>
+  <div class="wrap hd">
+    <div class="brand">
+      <h1>南南的沉淀库</h1>
+      <p class="sub" id="stat">正在读取…</p>
+    </div>
+    <div class="tools">
+      <div class="search">
+        <span class="ico">⌕</span>
+        <input id="q" type="search" placeholder="搜索标题 / 正文 / 标签" autocomplete="off">
+        <button class="clr" id="clrQ" title="清空">×</button>
+      </div>
+      <button class="btn primary" id="add">＋ 新增</button>
+      <button class="btn icon" id="fontBtn" title="切换字号">A</button>
+      <button class="btn icon" id="themeBtn" title="切换深浅色">◐</button>
+    </div>
+  </div>
+  <div class="wrap"><div class="tags" id="tagBar"></div></div>
+</header>
+
+<main class="wrap" id="list"></main>
+<div class="empty" id="empty" hidden></div>
+
+<footer class="wrap">
+  <span>数据存在这台设备的浏览器里</span>
+  <span class="spacer"></span>
+  <button id="expBtn">导出备份</button>
+  <button id="impBtn">导入备份</button>
+  <input type="file" id="impFile" accept="application/json,.json" hidden>
+</footer>
+
+<dialog id="dlg">
+  <div class="dlg-hd"><h2 id="dlgTitle">新增一条</h2></div>
+  <div class="dlg-bd">
+    <label class="f"><span>标题</span><input id="fTitle" placeholder="一句话说清这条是什么"></label>
+    <label class="f"><span>正文</span><textarea id="fBody" placeholder="想记下的内容。可以换行。"></textarea></label>
+    <label class="f"><span>标签</span><input id="fTags" placeholder="用逗号分隔，例如：读书, 方法"></label>
+    <p class="hint">标签会出现在顶部筛选栏，点一下就能只看这一类。</p>
+  </div>
+  <div class="dlg-ft">
+    <button class="btn" id="cancelBtn">取消</button>
+    <button class="btn primary" id="saveBtn">保存</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  var KEY = "nn.entries.v1";
+  var PREF = "nn.pref.v1";
+
+  /* ---------------- 存储 ---------------- */
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return null;
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : null;
+    } catch (e) { return null; }
+  }
+  function save(arr) {
+    try { localStorage.setItem(KEY, JSON.stringify(arr)); return true; }
+    catch (e) { alert("保存失败：浏览器存储不可用或已满。"); return false; }
+  }
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function now() { return new Date().toISOString(); }
+  function fmt(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    var p = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /* 首次进来放一条测试内容，用来验证一切正常，随时可删 */
+  function seed() {
+    return [{
+      id: uid(),
+      title: "测试条目：这条是给你试手的，看完可以删",
+      body: "如果你能看到这张卡片，说明整条链路都是通的：\n\n· 点卡片正文可以展开全文\n· 右上角「＋ 新增」能写新的一条\n· 鼠标移到卡片上会浮出「编辑 / 删除」\n· 顶部搜索框支持中文，输入「测试」试试\n· 标签点一下就能筛选，再点一下取消\n\n右下角可以「导出备份」，换了设备或清了浏览器缓存，用「导入备份」就能恢复。\n\n现在，把这条删掉，换上你自己的第一条。",
+      tags: ["测试", "使用说明"],
+      created: now(),
+      updated: now()
+    }];
+  }
+
+  var entries = load();
+  if (entries === null) { entries = seed(); save(entries); }
+
+  var prefs = (function () {
+    try { return JSON.parse(localStorage.getItem(PREF)) || {}; } catch (e) { return {}; }
+  })();
+  function savePrefs() {
+    try { localStorage.setItem(PREF, JSON.stringify(prefs)); } catch (e) {}
+  }
+
+  /* ---------------- 状态 ---------------- */
+  var q = "";
+  var activeTags = [];
+  var editingId = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var listEl = $("list"), emptyEl = $("empty"), tagBar = $("tagBar"), statEl = $("stat");
+
+  /* ---------------- 主题 / 字号 ---------------- */
+  var root = document.documentElement;
+  root.setAttribute("data-theme", prefs.theme || "light");
+  root.setAttribute("data-k", typeof prefs.k === "number" ? prefs.k : 1);
+
+  $("themeBtn").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    prefs.theme = next; savePrefs();
+  });
+  $("fontBtn").addEventListener("click", function () {
+    var k = (parseInt(root.getAttribute("data-k"), 10) + 1) % 3;
+    root.setAttribute("data-k", k);
+    prefs.k = k; savePrefs();
+  });
+
+  /* ---------------- 渲染 ---------------- */
+  function allTags() {
+    var map = {};
+    entries.forEach(function (e) {
+      (e.tags || []).forEach(function (t) { map[t] = (map[t] || 0) + 1; });
+    });
+    return Object.keys(map).sort(function (a, b) { return map[b] - map[a]; })
+      .map(function (t) { return { name: t, n: map[t] }; });
+  }
+
+  function filtered() {
+    var needle = q.trim().toLowerCase();
+    return entries.filter(function (e) {
+      var tags = e.tags || [];
+      for (var i = 0; i < activeTags.length; i++) {
+        if (tags.indexOf(activeTags[i]) === -1) return false;
+      }
+      if (!needle) return true;
+      var hay = (e.title + " " + e.body + " " + tags.join(" ")).toLowerCase();
+      return hay.indexOf(needle) !== -1;
+    }).sort(function (a, b) {
+      return (b.updated || b.created || "").localeCompare(a.updated || a.created || "");
+    });
+  }
+
+  function renderTags() {
+    var tags = allTags();
+    tagBar.innerHTML = "";
+    if (!tags.length) return;
+    tags.forEach(function (t) {
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.setAttribute("aria-pressed", activeTags.indexOf(t.name) !== -1 ? "true" : "false");
+      b.appendChild(document.createTextNode(t.name));
+      var n = document.createElement("span");
+      n.className = "n"; n.textContent = t.n;
+      b.appendChild(n);
+      b.addEventListener("click", function () {
+        var i = activeTags.indexOf(t.name);
+        if (i === -1) activeTags.push(t.name); else activeTags.splice(i, 1);
+        render();
+      });
+      tagBar.appendChild(b);
+    });
+  }
+
+  function render() {
+    var rows = filtered();
+    renderTags();
+    listEl.innerHTML = "";
+
+    rows.forEach(function (e) {
+      var card = document.createElement("article");
+      card.className = "card";
+      card.tabIndex = 0;
+
+      var h = document.createElement("h2");
+      h.textContent = e.title || "（无标题）";
+      card.appendChild(h);
+
+      var body = document.createElement("div");
+      body.className = "body";
+      body.textContent = e.body || "";
+      card.appendChild(body);
+
+      var canOpen = (e.body || "").length > 70;
+
+      var more = null;
+      if (canOpen) {
+        more = document.createElement("button");
+        more.className = "more"; more.textContent = "展开全文 ↓";
+        more.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          toggleOpen();
+        });
+        card.appendChild(more);
+      }
+
+      function toggleOpen() {
+        var on = card.classList.toggle("open");
+        if (more) more.textContent = on ? "收起 ↑" : "展开全文 ↓";
+      }
+
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      (e.tags || []).forEach(function (t) {
+        var s = document.createElement("span");
+        s.className = "tag"; s.textContent = t;
+        meta.appendChild(s);
+      });
+      var date = document.createElement("span");
+      date.className = "date";
+      date.textContent = fmt(e.updated || e.created);
+      meta.appendChild(date);
+
+      var sp = document.createElement("span");
+      sp.className = "spacer"; meta.appendChild(sp);
+
+      var acts = document.createElement("div");
+      acts.className = "acts";
+      var eb = document.createElement("button");
+      eb.className = "act"; eb.textContent = "编辑";
+      eb.addEventListener("click", function (ev) { ev.stopPropagation(); openEditor(e.id); });
+      var db = document.createElement("button");
+      db.className = "act"; db.textContent = "删除";
+      db.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        if (confirm("删除「" + (e.title || "无标题") + "」？删了就找不回来了。")) {
+          entries = entries.filter(function (x) { return x.id !== e.id; });
+          save(entries); render();
+        }
+      });
+      acts.appendChild(eb); acts.appendChild(db);
+      meta.appendChild(acts);
+
+      card.appendChild(meta);
+
+      card.addEventListener("click", function () {
+        if (!canOpen) return;
+        toggleOpen();
+      });
+      card.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" && canOpen) { toggleOpen(); }
+      });
+
+      listEl.appendChild(card);
+    });
+
+    var total = entries.length, shown = rows.length;
+    statEl.textContent = (q || activeTags.length)
+      ? "筛出 " + shown + " 条 / 共 " + total + " 条"
+      : "共 " + total + " 条";
+
+    if (!shown) {
+      emptyEl.hidden = false;
+      if (!total) {
+        emptyEl.innerHTML = "这里还很空。<br><b>点右上角「＋ 新增」写下第一条。</b>";
+      } else {
+        emptyEl.innerHTML = "没有匹配的条目。<br>试试换个词，或者点掉上面的标签。";
+      }
+    } else {
+      emptyEl.hidden = true;
+    }
+  }
+
+  /* ---------------- 搜索 ---------------- */
+  var timer = null;
+  $("q").addEventListener("input", function (ev) {
+    q = ev.target.value;
+    $("clrQ").classList.toggle("on", !!q);
+    clearTimeout(timer);
+    timer = setTimeout(render, 90);
+  });
+  $("clrQ").addEventListener("click", function () {
+    q = ""; $("q").value = ""; $("clrQ").classList.remove("on"); render();
+  });
+
+  /* ---------------- 编辑器 ---------------- */
+  var dlg = $("dlg");
+
+  function openEditor(id) {
+    editingId = id || null;
+    var e = id ? entries.filter(function (x) { return x.id === id; })[0] : null;
+    $("dlgTitle").textContent = e ? "编辑这一条" : "新增一条";
+    $("fTitle").value = e ? e.title : "";
+    $("fBody").value = e ? e.body : "";
+    $("fTags").value = e ? (e.tags || []).join(", ") : "";
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    setTimeout(function () { $("fTitle").focus(); }, 60);
+  }
+
+  function closeEditor() {
+    if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open");
+  }
+
+  function commit() {
+    var title = $("fTitle").value.trim();
+    var body = $("fBody").value.trim();
+    var tags = $("fTags").value.split(/[,，、\s]+/).map(function (s) { return s.trim(); })
+      .filter(function (s, i, a) { return s && a.indexOf(s) === i; });
+
+    if (!title && !body) { alert("标题和正文至少填一个。"); return; }
+
+    if (editingId) {
+      entries = entries.map(function (e) {
+        if (e.id !== editingId) return e;
+        return { id: e.id, title: title, body: body, tags: tags, created: e.created, updated: now() };
+      });
+    } else {
+      entries.unshift({ id: uid(), title: title, body: body, tags: tags, created: now(), updated: now() });
+    }
+    if (save(entries)) { closeEditor(); render(); }
+  }
+
+  $("add").addEventListener("click", function () { openEditor(null); });
+  $("saveBtn").addEventListener("click", commit);
+  $("cancelBtn").addEventListener("click", closeEditor);
+  dlg.addEventListener("cancel", function (ev) { ev.preventDefault(); closeEditor(); });
+  dlg.addEventListener("keydown", function (ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); commit(); }
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "n" && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); openEditor(null); }
+  });
+
+  /* ---------------- 导入 / 导出 ---------------- */
+  $("expBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    var d = new Date();
+    var p = function (n) { return n < 10 ? "0" + n : "" + n; };
+    a.href = URL.createObjectURL(blob);
+    a.download = "沉淀库备份-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  $("impBtn").addEventListener("click", function () { $("impFile").click(); });
+  $("impFile").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var arr = JSON.parse(fr.result);
+        if (!Array.isArray(arr)) throw new Error("格式不对");
+        var ok = arr.filter(function (e) { return e && (e.title || e.body); }).map(function (e) {
+          return {
+            id: e.id || uid(),
+            title: String(e.title || ""),
+            body: String(e.body || ""),
+            tags: Array.isArray(e.tags) ? e.tags.map(String) : [],
+            created: e.created || now(),
+            updated: e.updated || e.created || now()
+          };
+        });
+        if (!confirm("导入 " + ok.length + " 条，会和现有 " + entries.length + " 条合并。继续？")) return;
+        var seen = {};
+        entries.forEach(function (e) { seen[e.id] = 1; });
+        ok.forEach(function (e) { if (!seen[e.id]) { entries.push(e); seen[e.id] = 1; } });
+        if (save(entries)) { render(); alert("已导入 " + ok.length + " 条。"); }
+      } catch (err) {
+        alert("这个文件读不出来，需要是本站导出的 JSON 备份。");
+      } finally {
+        ev.target.value = "";
+      }
+    };
+    fr.readAsText(f);
+  });
+
+  render();
+})();
+</script>
 </body>
 </html>
