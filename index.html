@@ -215,6 +215,23 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
 .pal button.on::after{content:"";position:absolute;inset:-3px;border:2px solid var(--c,var(--ink-3));border-radius:50%}
 .pal button.none.on::after{border-color:var(--ink-3)}
 
+/* ---------- 云端 ---------- */
+footer .cloud{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;
+  padding:4px 11px;text-decoration:none;color:var(--ink-3);transition:.18s}
+footer .cloud:hover{border-color:var(--ink-3);color:var(--ink)}
+footer .cloud::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink-3);opacity:.5;transition:.2s}
+footer .cloud[data-s="ok"]::before{background:#3f8f6a;opacity:1}
+footer .cloud[data-s="saving"]::before{background:#c08a24;opacity:1;animation:blink 1s infinite}
+footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
+@keyframes blink{50%{opacity:.25}}
+#cloudDlg{width:min(520px,calc(100vw - 28px))}
+.cloud-tip{font-size:.78em;color:var(--ink-2);line-height:1.95;margin:0 0 16px}
+.cloud-tip code{background:var(--bg);border:1px solid var(--line-2);border-radius:4px;padding:1px 5px;font-size:.93em}
+.cloud-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.st{font-size:.76em;color:var(--ink-3);margin-top:12px;line-height:1.85;min-height:1.85em}
+.st.bad{color:#c0504d}
+.st.good{color:#3f8f6a}
+
 @media (max-width:600px){
   .hd{flex-direction:column;align-items:stretch;gap:9px;padding:13px 0 9px}
   .brand{display:flex;align-items:baseline;gap:9px;min-width:0}
@@ -269,7 +286,7 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
 <div class="empty" id="empty" hidden></div>
 
 <footer class="wrap">
-  <span>数据存在这台设备的浏览器里</span>
+  <button class="cloud" id="cloudBtn" data-s="off" title="设置云端同步">本地保存</button>
   <span class="spacer"></span>
   <button id="expBtn">导出备份</button>
   <button id="impBtn">导入备份</button>
@@ -326,6 +343,28 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
   <div class="dlg-hd"><h2>标签颜色</h2></div>
   <div class="dlg-bd" id="tagRows"></div>
   <div class="dlg-ft"><button class="btn primary" id="tagDone">完成</button></div>
+</dialog>
+
+<dialog id="cloudDlg">
+  <div class="dlg-hd"><h2>云端同步</h2></div>
+  <div class="dlg-bd">
+    <p class="cloud-tip">
+      连上之后，每次保存都会自动提交到 GitHub 私有仓库
+      <code>wuy9/nannan-notes-data</code>。换电脑、换浏览器、清缓存都不丢；每次提交都有历史，误删还能找回。
+    </p>
+    <label class="f"><span>访问令牌（只存在这台设备的浏览器里）</span>
+      <input id="cloudToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="hint" style="margin:-2px 0 18px">
+      还没有？<a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=nannan-notes" target="_blank" rel="noopener">点这里生成</a>：勾上 <b>repo</b>，生成后复制那一串粘到上面。
+    </p>
+    <div class="cloud-row">
+      <button class="btn primary" id="cloudConnect">连接并同步</button>
+      <button class="btn" id="cloudOff">断开并改回本地</button>
+    </div>
+    <div class="st" id="cloudSt">未连接，现在只存在这台设备的浏览器里。</div>
+  </div>
+  <div class="dlg-ft"><button class="btn" id="cloudDone">完成</button></div>
 </dialog>
 
 <script>
@@ -461,13 +500,16 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
     return Array.isArray(arr) ? arr : null;
   }
   function save(arr) {
-    try { localStorage.setItem(KEY, JSON.stringify(arr)); return true; }
+    try { localStorage.setItem(KEY, JSON.stringify(arr)); }
     catch (e) { alert("保存失败：浏览器存储不可用或已满。"); return false; }
+    scheduleSync();
+    return true;
   }
   var tagColors = readJSON(TKEY, {});
   if (!tagColors || typeof tagColors !== "object" || Array.isArray(tagColors)) tagColors = {};
   function saveTagColors() {
     try { localStorage.setItem(TKEY, JSON.stringify(tagColors)); } catch (e) {}
+    scheduleSync();
   }
 
   /* 兼容老数据：v1 的纯文本正文转成 HTML，并补齐 group / color 字段 */
@@ -1074,6 +1116,214 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
     if (tagDlg.open) tagDlg.close();
   });
 
+  /* ---------------- 云端同步（GitHub 私有仓库） ---------------- */
+  var CLOUD_REPO = { owner: "wuy9", repo: "nannan-notes-data", path: "notes.json" };
+  var CTOKEN = "nn.cloud.token";
+  var cloudToken = "";
+  try { cloudToken = localStorage.getItem(CTOKEN) || ""; } catch (e) {}
+  var apiBase = "https://api.github.com";
+  try { if (localStorage.getItem("nn.api.base")) apiBase = localStorage.getItem("nn.api.base"); } catch (e) {}
+
+  var cloud = { sha: null, syncing: false, dirty: false, ready: false, state: "off", at: "", err: "" };
+
+  function b64enc(s) {
+    var bytes = new TextEncoder().encode(s), bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function b64dec(b) {
+    var bin = atob(String(b || "").replace(/\s/g, ""));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function fileURL() {
+    return apiBase + "/repos/" + CLOUD_REPO.owner + "/" + CLOUD_REPO.repo + "/contents/" + CLOUD_REPO.path;
+  }
+  function ghHeaders() {
+    return {
+      "Authorization": "Bearer " + cloudToken,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json"
+    };
+  }
+  function cloudDoc() {
+    return { v: 2, updatedAt: now(), tagColors: tagColors, entries: entries };
+  }
+
+  async function cloudPull() {
+    var r = await fetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+    if (r.status === 404) { cloud.sha = null; return null; }
+    if (!r.ok) throw new Error(r.status === 401 ? "令牌无效或权限不足（需勾选 repo）" : "读取失败 HTTP " + r.status);
+    var j = await r.json();
+    cloud.sha = j.sha;
+    return JSON.parse(b64dec(j.content));
+  }
+
+  async function cloudPush(msg) {
+    var payload = { message: msg || "更新笔记", content: b64enc(JSON.stringify(cloudDoc(), null, 2)), branch: "main" };
+    if (cloud.sha) payload.sha = cloud.sha;
+    var r = await fetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
+
+    if (r.status === 409 || r.status === 412 || r.status === 422) {
+      // 云端被别人（或另一台设备）改过，取最新 sha 再覆盖一次
+      var f = await fetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+      if (f.ok) { var fj = await f.json(); cloud.sha = fj.sha; }
+      payload.sha = cloud.sha;
+      if (!payload.sha) delete payload.sha;
+      r = await fetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
+    }
+    if (!r.ok) {
+      if (r.status === 401) throw new Error("令牌无效或已过期");
+      if (r.status === 403) throw new Error("没有写权限（令牌需勾选 repo）");
+      if (r.status === 404) throw new Error("仓库 " + CLOUD_REPO.owner + "/" + CLOUD_REPO.repo + " 不存在");
+      throw new Error("写入失败 HTTP " + r.status);
+    }
+    var jr = await r.json();
+    if (jr && jr.content && jr.content.sha) cloud.sha = jr.content.sha;
+    cloud.at = new Date().toTimeString().slice(0, 5);
+    return true;
+  }
+
+  function applyRemote(d) {
+    entries = migrate(Array.isArray(d.entries) ? d.entries : []);
+    tagColors = (d.tagColors && typeof d.tagColors === "object" && !Array.isArray(d.tagColors)) ? d.tagColors : {};
+    try {
+      localStorage.setItem(KEY, JSON.stringify(entries));
+      localStorage.setItem(TKEY, JSON.stringify(tagColors));
+    } catch (e) {}
+  }
+
+  var statusText = {
+    off: "本地保存", ok: "已存云端", saving: "正在保存…", error: "保存失败"
+  };
+  function setCloud(s, err) {
+    cloud.state = s;
+    cloud.err = s === "error" ? (err || "") : "";
+    var btn = $("cloudBtn");
+    if (!btn) return;
+    btn.setAttribute("data-s", s);
+    var label = statusText[s] || "云端";
+    if (s === "ok" && cloud.at) label += " · " + cloud.at;
+    btn.textContent = label;
+    btn.title = s === "error" ? (cloud.err || "保存失败，点这里重试") : "点这里设置云端同步";
+
+    var st = $("cloudSt");
+    if (st) {
+      st.className = "st" + (s === "error" ? " bad" : s === "ok" ? " good" : "");
+      if (!cloudToken) st.textContent = "未连接，现在只存在这台设备的浏览器里。";
+      else if (s === "error") st.textContent = "同步失败：" + cloud.err + "。本地还有一份，没丢。";
+      else if (s === "saving") st.textContent = "正在写入云端…";
+      else if (s === "ok") st.textContent = "已连接 · 最近一次写入 " + (cloud.at || "刚刚");
+    }
+  }
+
+  var syncTimer = null;
+  function scheduleSync() {
+    if (!cloudToken || !cloud.ready) return;
+    cloud.dirty = true;
+    setCloud("saving");
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(runSync, 700);
+  }
+  async function runSync() {
+    if (cloud.syncing) return;
+    cloud.syncing = true;
+    cloud.dirty = false;
+    try {
+      await cloudPush("更新 " + new Date().toLocaleString("zh-CN"));
+      setCloud("ok");
+    } catch (e) {
+      setCloud("error", e.message);
+    } finally {
+      cloud.syncing = false;
+      if (cloud.dirty) runSync();
+    }
+  }
+
+  async function connectCloud() {
+    var t = $("cloudToken").value.trim();
+    if (!t) { setCloud("error", "先粘贴令牌"); cloudToken = ""; return; }
+    cloudToken = t;
+    try { localStorage.setItem(CTOKEN, t); } catch (e) {}
+    cloud.sha = null;
+    setCloud("saving");
+    try {
+      var remote = await cloudPull();
+      if (!remote) {
+        await cloudPush("首次同步：" + entries.length + " 条笔记");
+      } else {
+        var rn = (remote.entries || []).length, ln = entries.length;
+        if (rn === 0) {
+          await cloudPush("云端为空，写入本地 " + ln + " 条");
+        } else if (ln === 0) {
+          applyRemote(remote);
+        } else if (confirm("云端已有 " + rn + " 条，本地有 " + ln + " 条。\n\n点「确定」：用**云端**覆盖本地（新设备/重装就选这个）\n点「取消」：用**本地**覆盖云端（刚连上、本地才是你要的）")) {
+          applyRemote(remote);
+        } else {
+          await cloudPush("用本地内容覆盖云端");
+        }
+      }
+      cloud.ready = true;
+      setCloud("ok");
+      render();
+    } catch (e) {
+      cloud.ready = false;
+      setCloud("error", e.message);
+      $("cloudSt").textContent = "连接失败：" + e.message + "。请确认令牌勾了 repo、仓库已建好。";
+    }
+  }
+
+  function disconnectCloud() {
+    if (!confirm("断开后笔记只存在这台设备的浏览器里，不再往云端写。确定？")) return;
+    try { localStorage.removeItem(CTOKEN); } catch (e) {}
+    cloudToken = "";
+    cloud.ready = true;
+    cloud.sha = null;
+    setCloud("off");
+  }
+
+  async function bootCloud() {
+    if (!cloudToken) { cloud.ready = true; setCloud("off"); return; }
+    setCloud("saving");
+    try {
+      var remote = await cloudPull();
+      if (remote && Array.isArray(remote.entries) && remote.entries.length) {
+        applyRemote(remote);
+        setCloud("ok");
+        render();
+      } else {
+        await cloudPush("首次同步：" + entries.length + " 条笔记");
+        setCloud("ok");
+      }
+    } catch (e) {
+      setCloud("error", e.message);
+    }
+    cloud.ready = true;
+  }
+
+  var cloudDlg = $("cloudDlg");
+  function openCloud() {
+    $("cloudToken").value = cloudToken;
+    $("cloudOff").hidden = !cloudToken;
+    $("cloudConnect").textContent = cloudToken ? "立即同步" : "连接并同步";
+    setCloud(cloud.state);
+    if (typeof cloudDlg.showModal === "function") cloudDlg.showModal(); else cloudDlg.setAttribute("open", "");
+    if (!cloudToken) setTimeout(function () { $("cloudToken").focus(); }, 80);
+  }
+  $("cloudBtn").addEventListener("click", openCloud);
+  $("cloudDone").addEventListener("click", function () { if (cloudDlg.open) cloudDlg.close(); });
+  $("cloudOff").addEventListener("click", disconnectCloud);
+  $("cloudConnect").addEventListener("click", connectCloud);
+  $("cloudToken").addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") { ev.preventDefault(); connectCloud(); }
+  });
+  cloudDlg.addEventListener("cancel", function (ev) { ev.preventDefault(); cloudDlg.close(); });
+
+  window.addEventListener("online", function () {
+    if (cloudToken && cloud.state === "error") { cloud.ready = true; runSync(); }
+  });
+
   /* ---------------- 导入 / 导出 ---------------- */
   $("expBtn").addEventListener("click", function () {
     var pack = { v: 2, exportedAt: now(), tagColors: tagColors, entries: entries };
@@ -1127,6 +1377,7 @@ dialog::backdrop{background:rgba(30,22,14,.42);backdrop-filter:blur(2px)}
   });
 
   render();
+  bootCloud();
 })();
 </script>
 </body>
