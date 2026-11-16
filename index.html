@@ -1355,6 +1355,24 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
   $("cloudToken").addEventListener("keydown", function (ev) {
     if (ev.key === "Enter") { ev.preventDefault(); connectCloud(); }
   });
+  /* 边粘边认：粘错东西（比如网页地址）立刻提示，不用等点按钮 */
+  $("cloudToken").addEventListener("input", function () {
+    var v = this.value.trim();
+    var st = $("cloudSt");
+    if (!v) {
+      st.className = "st";
+      st.textContent = "未连接，现在只存在这台设备的浏览器里。";
+    } else if (!/^(ghp_|github_pat_|gho_|ghs_|ghu_|ghr_)/.test(v)) {
+      st.className = "st bad";
+      st.textContent = "这一串不是令牌 —— 令牌以 ghp_ 开头。你是不是复制了网页地址？";
+    } else if (v.length < 30) {
+      st.className = "st bad";
+      st.textContent = "好像没复制全，令牌是 40 位左右，再复制一次。";
+    } else {
+      st.className = "st";
+      st.textContent = "看着像令牌了，点「连接并同步」验证一下。";
+    }
+  });
   cloudDlg.addEventListener("cancel", function (ev) { ev.preventDefault(); cloudDlg.close(); });
 
   window.addEventListener("online", function () {
