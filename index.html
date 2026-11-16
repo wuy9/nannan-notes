@@ -351,12 +351,13 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
     <p class="cloud-tip">
       连上之后，每次保存都会自动提交到 GitHub 私有仓库
       <code>wuy9/nannan-notes-data</code>。换电脑、换浏览器、清缓存都不丢；每次提交都有历史，误删还能找回。
+      <br>令牌<b>只需要填一次</b>，之后打开这个网页不用再填；只有换设备或清了浏览器数据才需要重填。
     </p>
     <label class="f"><span>访问令牌（只存在这台设备的浏览器里）</span>
       <input id="cloudToken" type="password" placeholder="ghp_… 或 github_pat_…" autocomplete="off" spellcheck="false">
     </label>
     <p class="hint" style="margin:-2px 0 18px">
-      还没有？<a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=nannan-notes" target="_blank" rel="noopener">点这里生成</a>：勾上 <b>repo</b>，生成后复制那一串粘到上面。
+      还没有？<a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=nannan-notes" target="_blank" rel="noopener">点这里生成</a>：勾上 <b>repo</b>，点最下面的 <b>Generate token</b>，复制 <b>ghp_</b> 开头的那一串（别复制网页地址）。
     </p>
     <div class="cloud-row">
       <button class="btn primary" id="cloudConnect">连接并同步</button>
@@ -1151,8 +1152,21 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
     return { v: 2, updatedAt: now(), tagColors: tagColors, entries: entries };
   }
 
+  async function ghFetch(url, opt) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 20000);
+    try {
+      return await fetch(url, Object.assign({}, opt, { signal: ctrl.signal }));
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("连不上 GitHub（20 秒没响应），检查网络后再试");
+      throw new Error("网络错误：" + (e && e.message ? e.message : "未知原因"));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function cloudPull() {
-    var r = await fetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+    var r = await ghFetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
     if (r.status === 404) { cloud.sha = null; return null; }
     if (!r.ok) throw new Error(r.status === 401 ? "令牌无效或权限不足（需勾选 repo）" : "读取失败 HTTP " + r.status);
     var j = await r.json();
@@ -1163,15 +1177,15 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
   async function cloudPush(msg) {
     var payload = { message: msg || "更新笔记", content: b64enc(JSON.stringify(cloudDoc(), null, 2)), branch: "main" };
     if (cloud.sha) payload.sha = cloud.sha;
-    var r = await fetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
+    var r = await ghFetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
 
     if (r.status === 409 || r.status === 412 || r.status === 422) {
       // 云端被别人（或另一台设备）改过，取最新 sha 再覆盖一次
-      var f = await fetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+      var f = await ghFetch(fileURL() + "?ref=main&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
       if (f.ok) { var fj = await f.json(); cloud.sha = fj.sha; }
       payload.sha = cloud.sha;
       if (!payload.sha) delete payload.sha;
-      r = await fetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
+      r = await ghFetch(fileURL(), { method: "PUT", headers: ghHeaders(), body: JSON.stringify(payload) });
     }
     if (!r.ok) {
       if (r.status === 401) throw new Error("令牌无效或已过期");
@@ -1241,14 +1255,34 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
     }
   }
 
+  async function checkRepo() {
+    var r = await ghFetch(apiBase + "/repos/" + CLOUD_REPO.owner + "/" + CLOUD_REPO.repo, { headers: ghHeaders() });
+    if (r.ok) { return; }
+    if (r.status === 401) throw new Error("令牌无效、已过期或被撤销，请重新生成一个");
+    if (r.status === 404) throw new Error("这个令牌看不到私有仓库 " + CLOUD_REPO.owner + "/" + CLOUD_REPO.repo + "。细粒度令牌要把这个仓库加进 Only select repositories，并给 Contents 读写权限；经典令牌要勾 repo");
+    if (r.status === 403) throw new Error("GitHub 暂时拒绝了请求（可能触发限流），等一分钟再试");
+    throw new Error("检查仓库失败 HTTP " + r.status);
+  }
+
   async function connectCloud() {
     var t = $("cloudToken").value.trim();
-    if (!t) { setCloud("error", "先粘贴令牌"); cloudToken = ""; return; }
+    var st = $("cloudSt");
+    if (!t) {
+      st.className = "st bad";
+      st.textContent = "还没粘贴令牌。点上面的「点这里生成」，生成后复制 ghp_ 开头的那一串。";
+      return;
+    }
+    if (!/^(ghp_|github_pat_|gho_|ghs_|ghu_|ghr_)/.test(t) || t.length < 20) {
+      st.className = "st bad";
+      st.textContent = "这看起来不是令牌（是不是把网页地址复制过来了？）。令牌是一串以 ghp_ 开头的字符，点 Generate token 之后只显示一次，直接复制它。";
+      return;
+    }
     cloudToken = t;
-    try { localStorage.setItem(CTOKEN, t); } catch (e) {}
     cloud.sha = null;
     setCloud("saving");
     try {
+      await checkRepo();
+      try { localStorage.setItem(CTOKEN, t); } catch (e) {}
       var remote = await cloudPull();
       if (!remote) {
         await cloudPush("首次同步：" + entries.length + " 条笔记");
@@ -1258,7 +1292,7 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
           await cloudPush("云端为空，写入本地 " + ln + " 条");
         } else if (ln === 0) {
           applyRemote(remote);
-        } else if (confirm("云端已有 " + rn + " 条，本地有 " + ln + " 条。\n\n点「确定」：用**云端**覆盖本地（新设备/重装就选这个）\n点「取消」：用**本地**覆盖云端（刚连上、本地才是你要的）")) {
+        } else if (confirm("云端已有 " + rn + " 条，本地有 " + ln + " 条。\n\n点「确定」：用云端覆盖本地（新设备/重装就选这个）\n点「取消」：用本地覆盖云端（刚连上、本地才是你要的）")) {
           applyRemote(remote);
         } else {
           await cloudPush("用本地内容覆盖云端");
@@ -1266,11 +1300,14 @@ footer .cloud[data-s="error"]::before{background:#c0504d;opacity:1}
       }
       cloud.ready = true;
       setCloud("ok");
+      $("cloudOff").hidden = false;
+      $("cloudConnect").textContent = "立即同步";
       render();
     } catch (e) {
       cloud.ready = false;
       setCloud("error", e.message);
-      $("cloudSt").textContent = "连接失败：" + e.message + "。请确认令牌勾了 repo、仓库已建好。";
+      st.className = "st bad";
+      st.textContent = "没连上：" + e.message;
     }
   }
 
